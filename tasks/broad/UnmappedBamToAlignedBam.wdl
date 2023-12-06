@@ -251,8 +251,8 @@ workflow UnmappedBamToAlignedBam {
       # Apply the recalibration model by interval
       call Processing.ApplyBQSR as ApplyBQSR {
         input:
-          input_bam = SortSampleBam.output_bam,
-          input_bam_index = SortSampleBam.output_bam_index,
+          input_bam = ReheaderSortSampleBam.output_bam,
+          input_bam_index = ReheaderSortSampleBam.output_bam_index,
           output_bam_basename = recalibrated_bam_basename,
           recalibration_report = GatherBqsrReports.output_bqsr_report,
           sequence_group_interval = subgroup,
@@ -322,7 +322,7 @@ task ReheaderSortSampleBam {
 
   output {
     File output_bam = "~{base_name}.reheader.bam"
-    File output_bam_index = "~{base_name}.reheader.bam"
+    File output_bam_index = "~{base_name}.reheader.bam.bai"
   }
 
   command {
