@@ -216,6 +216,12 @@ workflow UnmappedBamToAlignedBam {
   Int potential_bqsr_divisor = num_of_bqsr_scatters - 10
   Int bqsr_divisor = if potential_bqsr_divisor > 1 then potential_bqsr_divisor else 1
 
+  # hack to fix PL in the header
+  call ReheaderSortSampleBam {
+    input:
+      input_bam=SortSampleBam.output_bam
+  }
+
   # Perform Base Quality Score Recalibration (BQSR) on the sorted BAM in parallel
 
   if (perform_bqsr) {
@@ -223,8 +229,8 @@ workflow UnmappedBamToAlignedBam {
       # Generate the recalibration model by interval
       call Processing.BaseRecalibrator as BaseRecalibrator {
         input:
-          input_bam = SortSampleBam.output_bam,
-          input_bam_index = SortSampleBam.output_bam_index,
+          input_bam = ReheaderSortSampleBam.output_bam,
+          input_bam_index = ReheaderSortSampleBam.output_bam_index,
           recalibration_report_filename = sample_and_unmapped_bams.base_file_name + ".recal_data.csv",
           sequence_group_interval = subgroup,
           dbsnp_vcf = references.dbsnp_vcf,
@@ -306,4 +312,56 @@ workflow UnmappedBamToAlignedBam {
   meta {
     allowNestedInputs: true
   }
+}
+
+task ReheaderSortSampleBam {
+  input {
+    File input_bam
+    Int additional_disk = 0
+    Int memory_multiplier = 1
+  }
+
+  Int disk_size = ceil((size(input_bam, "GiB") * 3) + additional_disk)
+
+  Int memory_size = ceil(3.5 * memory_multiplier)
+
+  String base_name = basename(input_bam, ".bam")
+
+  output {
+    File output_bam = "~{base_name}.reheader.bam"
+    File output_bam_index = "~{base_name}.reheader.bam"
+  }
+
+  command {
+    samtools view -H ~{input_bam} > header.sam
+    python << CODE
+    import os
+    fout = open("header2.sam", "w")
+    for line in open("header.sam"):
+      found_pl = False
+      if line.startswith("@RG"):
+        fields = line.strip().split("\t")
+        for i in range(1, len(fields)):
+          toks = fields[i].split(":")
+          if toks[0] == "PL":
+            found_pl = True
+            fields[i] = toks[0] + ":" + "ILLUMINA"
+        if not found_pl:
+          fields.append("PL:ILLUMINA")
+        fout.write("\t".join(fields) + "\n")
+      else:
+        fout.write(line)
+    fout.close()
+    CODE
+    samtools reheader header2.sam ~{input_bam} > ~{base_name}.reheader.bam
+    samtools index ~{base_name}.reheader.bam
+  }
+
+  runtime {
+    docker: "us.gcr.io/broad-gotc-prod/samtools-picard-bwa:1.0.2-0.7.15-2.26.10-1643840748"
+    preemptible: 2
+    memory: "~{memory_size} GiB"
+    disks: "local-disk " + disk_size + " HDD"
+  }
+
 }
