@@ -351,7 +351,7 @@ task ReheaderSortSampleBam {
   }
 
   runtime {
-    docker: "us.gcr.io/broad-gotc-prod/samtools-picard-bwa:1.0.2-0.7.15-2.26.10-1643840748"
+    docker: "us.gcr.io/broad-dsde-methods/gatk-sv/sv-pipeline:2023-09-13-v0.28.3-beta-af8362e3"
     preemptible: 2
     memory: "~{memory_size} GiB"
     disks: "local-disk " + disk_size + " HDD"
