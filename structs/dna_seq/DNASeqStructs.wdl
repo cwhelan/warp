@@ -43,7 +43,7 @@ struct DNASeqSingleSampleReferences {
 
   File evaluation_interval_list
 
-  File haplotype_database_file
+  File? haplotype_database_file
 }
 
 struct VariantCallingScatterSettings {
